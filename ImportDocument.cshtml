@@ -1,0 +1,1158 @@
+﻿@Html.Partial("_ScreenPermis")
+@using message = KBT_DMS.ResourceFile.Common.ScreenLabelResource;
+@{
+    //ViewBag.Title = "Test";
+    List<SelectListItem> authorizedOfficers = ViewBag.authorizedOfficers;
+}
+
+<link href="~/Content/Common/bootstrap-table.css" rel="stylesheet" />
+<script src="~/Scripts/Common/bootstrap-table.js"></script>
+<script src="~/Scripts/Common/bootstrap-table-th-TH.js"></script>
+
+<script type="text/javascript">
+    //var invData = @Html.Raw(Json.Encode(ViewBag.newAccountTable));
+    //var accountData = @Html.Raw(Json.Encode(ViewBag.existingAccountTable));
+    var importData = @Html.Raw(Json.Encode(ViewBag.importTable));// optimize
+    var modal;
+    var newIDmodal;
+
+    function generateInvTable(condition) {
+        var data = [];
+
+        // add data to BootstrapTable then load.
+        @*for (var i = 0; i < invData.length; i++) {
+            var obj = invData[i];
+            var detail = {};
+            if(obj.disableRow){
+                detail["selectDoc"] = "<input type='checkbox' value='"+obj.importEntryNo+"' disabled/>";
+                //detail["preview"] = "";
+            }
+            else{
+                detail["selectDoc"] =  "<input type='checkbox' name='selectDocChk' id='selectDoc" + obj.importEntryNo + "' value='"+obj.importEntryNo+"' />";
+                //detail["preview"] = "<a href='#' class='link' onclick='previewData(&quot;" + obj.importEntryNo + "&quot;);' >@message.LabelPreviewData</a>"
+            }
+            //detail["preview"] = "<a href='#' class='link' onclick='previewData(&quot;" + obj.importEntryNo + "&quot;);' >@message.LabelPreviewData</a>"
+            detail["importEntryNo"] = obj.importEntryNo;
+            detail["invoiceNo"] = obj.invoiceNo;
+            detail["invoiceDate"] = obj.invoiceDate;
+            detail["documentStatus"] = obj.documentStatus;
+            detail["documentNo"] = obj.documentNo;
+            detail["username"] = obj.createBy;
+
+            if (condition == 'all') {
+                data.push(detail);
+            } else if (condition == 'lock' && obj.documentStatus == 'สร้างบัญชีแล้ว') {
+                data.push(detail);
+            } else if (condition == 'unlock' && obj.documentStatus == 'ยังไม่สร้างบัญชี') {
+                data.push(detail);
+            }
+            else if (condition == 'cancel' && obj.documentStatus == 'ยกเลิกบัญชี') {
+                data.push(detail);
+            }
+        }
+        $('#invoiceTable').bootstrapTable('load', data);*@
+    }
+    function generateAccountTable(condition) {
+        var data = [];
+
+        // add data to BootstrapTable then load.
+        //for (var i = 0; i < accountData.length; i++) {
+        //    var obj = accountData[i];
+        //    var detail = {};
+        //    if(obj.disableRow){
+        //        detail["selectDoc"] = "<input type='checkbox' value='"+obj.documentNo+"' disabled />";
+        //    }
+        //    else{
+        //        detail["selectDoc"] =  "<input type='checkbox' value='"+obj.documentNo+"' />";
+        //    }
+        //    //detail["selectDoc"] =  "<input type='checkbox' value='"+obj.documentNo+"' />";
+        //    detail["documentNo"] = obj.documentNo;
+        //    detail["documentStatus"] = obj.documentStatus;
+        //    detail["createDate"] = obj.createDate;
+        //    detail["username"] = obj.createBy;
+        //    if (condition == 'all') {
+        //        data.push(detail);
+        //    } else if (condition == 'lock' && obj.documentStatus == 'สร้างบัญชีแล้ว') {
+        //        data.push(detail);
+        //    } else if (condition == 'unlock' && obj.documentStatus == 'ยังไม่สร้างบัญชี') {
+        //        data.push(detail);
+        //    }
+        //    else if (condition == 'cancel' && obj.documentStatus == 'ยกเลิกบัญชี') {
+        //        data.push(detail);
+        //    }
+        //}
+        //$('#accountTable').bootstrapTable('load', data);
+    }
+    function getFileDownload(filename){
+        window.open('@Url.Action("getFileDownload", "ExportFile")'+ '?filepath='+filename, '_blank');
+        setTimeout(function(){},2000); // Time delay for next file
+    }
+
+    function validateCheckBox(importType) {
+        if (importType == 'new') {
+            var importEntries = $('#invoiceTable input[type=checkbox]:checked');
+            if(importEntries.length > 0) {
+                return true;
+            } else {
+                return false;
+            }
+        } else if (importType == 'reprint') {
+            var docNumbers =  $('#accountTable input[type=checkbox]:checked');
+            var docNumberTextBox = $('#rePrintDoc').val().trim();
+            if(docNumbers.length > 0 || docNumberTextBox != '') {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+
+    function validateRequired(importType) {
+        //if (importType == 'new') {
+        var Form32BookNo = $('#Form32BookNo').val();
+        var Form32No = $('#Form32No').val();
+        var Form32ApproveDate = $('#Form32ApproveDate').val();
+        var TaxNo = $('#TaxNo').val();
+        var TaxDate = $('#TaxDate').val();
+        var officerID = $('#authorized').val();
+
+        if(Form32BookNo == ''
+            || Form32No == ''
+            || Form32ApproveDate == ''
+            || TaxNo == ''
+            || TaxDate == ''
+            || officerID == 0) {
+
+            return false;
+        } else {
+            return true;
+        }
+        //} else {
+        //    return true;
+        //}
+    }
+
+    function initializeDatePicker() {
+        $.datepicker.setDefaults(
+          $.extend(
+            { 'dateFormat': 'dd/mm/yy' }
+            //,
+            //{ 'isBE': true, },
+            //{ 'autoConversionField': true }
+          )
+        );
+        $('#Form32ApproveDate').datepicker({ isBE: true, autoConversionField: true });
+        $('#TaxDate').datepicker({ isBE: true, autoConversionField: true });
+    }
+    /*============ event after check checkbox===============*/
+    function fillPreviousDocData(importEntryNo) {
+        var data = $('#invoiceTable').bootstrapTable('getData');
+        for(i=0 ; i< data.length ; i++) {
+            var obj = data[i];
+            if(obj.importEntryNo == importEntryNo) {
+                // put ajax logic here
+                var docNo = obj.documentNo;
+                $.ajax({
+                    url: '@Url.Action("GetImportDocumentKeyInData", "ExportFile")',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        documentNo: docNo,
+                    }),
+                    async: true,
+                    processData: false,
+                    datatype: "json",
+                    contentType: 'application/json; charset=utf-8',
+                    success: function (data) {
+                        if (!data.sessionExpiredResult && !data.permissionResult) {
+                            if (data != null) {
+                                $('#Form32BookNo').val(data.Form32BookNo);
+                                $('#Form32No').val(data.Form32No);
+                                $('#Form32ApproveDate').val(data.Form32ApproveDate);
+                                $('#TaxNo').val(data.TaxNo);
+                                $('#TaxDate').val(data.TaxDate);
+                                $('#authorized').val(data.authUserID);
+                            }
+                        }
+                    },
+                    error: function(xhr) {
+                        try {
+                            var exception = $.parseJSON(xhr.responseText);
+                            popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                        } catch (e) {
+                            popup('@message.PopupUnexpectedError');
+                        }
+                    }
+                });
+                break;
+            }
+        }
+    }
+    /*============ event after check checkbox===============*/
+    function getPreviewData(importEntryNo) {
+        $.ajax({
+            url: '@Url.Action("getPreviewImportNewDocData", "ExportFile")',
+            type: 'POST',
+            data: JSON.stringify({
+                importEntryNo: importEntryNo,
+            }),
+            async: true,
+            processData: false,
+            datatype: "json",
+            contentType: 'application/json; charset=utf-8',
+            success: function (data) {
+            },
+            error: function(xhr) {
+                try {
+                    var exception = $.parseJSON(xhr.responseText);
+                    popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                } catch (e) {
+                    popup('@message.PopupUnexpectedError');
+                }
+            }
+        });
+    }
+
+    function previewData(importEntryNo) {
+        //popup(importEntryNo);
+        getPreviewData(importEntryNo);
+        modal.find('.modal-title').text('ตัวอย่างข้อมูล Import Entry No. :' + importEntryNo);
+        modal.modal('show');
+    }
+
+    function clearNewIDModal() {
+        newIDmodal.find('input[name]').each(function () {
+            $(this).val('');
+        });
+        newIDmodal.find('select[name]').each(function () {
+            $(this).val('0');
+        });
+        newIDmodal.modal('hide');
+    }
+
+</script>
+<script type="text/javascript">
+    $(document).ready(function () {
+        $('#invoiceTable').bootstrapTable({
+            striped: true,
+            pagination: true,
+            pageSize: 10, //specify 5 here
+            pageList: [5, 10, 25, 50, 100, 200],
+            search: true
+        });
+
+        $('#accountTable').bootstrapTable({
+            striped: true,
+            pagination: true,
+            pageSize: 10, //specify 5 here
+            pageList: [5, 10, 25, 50, 100, 200],
+            search: true
+        });
+        generateInvTable('all');
+        generateAccountTable('all');
+        $("#accountDiv").hide();
+        $('#rePrintDoc').prop('disabled', true);
+
+        $("#modeNewDoc").click(function () {
+
+            $("#invoiceDiv").show();
+            $("#accountDiv").hide();
+            $('#rePrintDoc').prop('disabled', true);
+            //$('#Form32BookNo').prop('disabled', false);
+            //$('#Form32No').prop('disabled', false);
+            //$('#Form32ApproveDate').prop('disabled', false);
+            //$('#TaxNo').prop('disabled', false);
+            //$('#TaxDate').prop('disabled', false);
+            //$('#authorized').prop('disabled', false);
+            //$('#status').prop('disabled', false);
+        });
+
+        $("#modeReprint").click(function () {
+
+            $("#invoiceDiv").hide();
+            $("#accountDiv").show();
+            $('#rePrintDoc').prop('disabled', false);
+            $('#rePrintDoc').focus();
+            //$('#Form32BookNo').prop('disabled', true);
+            //$('#Form32No').prop('disabled', true);
+            //$('#Form32ApproveDate').prop('disabled', true);
+            //$('#TaxNo').prop('disabled', true);
+            //$('#TaxDate').prop('disabled', true);
+            //$('#authorized').prop('disabled', true);
+            //$('#status').prop('disabled', true);
+        });
+
+        $('#allInv').change(function(){
+            if($(this).is(':checked')) {
+                $('#invoiceTable input[type=checkbox]:not(:disabled)').prop('checked', true);
+            }
+            else {
+                $('#invoiceTable input[type=checkbox]:not(:disabled)').prop('checked', false);
+            }
+
+        });
+        $('#allAcc').change(function(){
+            if($(this).is(':checked')) {
+                $('#accountTable input[type=checkbox]:not(:disabled)').prop('checked', true);
+            }
+            else {
+                $('#accountTable input[type=checkbox]:not(:disabled)').prop('checked', false);
+            }
+
+        });
+
+        $('#btnExport').prop('disabled', false);
+        $('#btnCancel').prop('disabled', false);
+
+        modal = $('#modal').modal({ show: false });
+        newIDmodal = $('#newIDmodal').modal({ show: false });
+        newIDmodal.find('#btnCancelModal').click(function(){
+            clearNewIDModal();
+        });
+        /*===== Save Model====================*/
+        @*newIDmodal.find('#btnSaveModal').click(function () {
+            var importType = $('input[name=importType]:checked').val();
+            var Form32BookNo = $('#Form32BookNo').val();
+            var Form32No = $('#Form32No').val();
+            var Form32ApproveDate = $('#Form32ApproveDate').val();
+            var TaxNo = $('#TaxNo').val();
+            var TaxDate = $('#TaxDate').val();
+            var officerID = $('#authorized').val();
+
+            if(validateRequired(importType)) {
+                var loadPopup = loading('@message.LoadingDocCreation');
+                if(importType == 'new') {
+                    var importEntries = [];
+                    $('#invoiceTable input[type=checkbox]:checked').each(function(){
+                        importEntries.push(this.value);
+                    });
+
+                    $.ajax({
+                        url: '@Url.Action("generateImportedNewDoc", "ExportFile")',
+                        type: 'POST',
+                        data: JSON.stringify({
+                            'importEntries': importEntries,
+                            'officerID': officerID,
+                            'Form32BookNo': Form32BookNo,
+                            'Form32No': Form32No,
+                            'Form32ApproveDate': Form32ApproveDate,
+                            'TaxNo': TaxNo,
+                            'TaxDate': TaxDate
+                        }),
+                        async: true,
+                        processData: false,
+                        datatype: "json",
+                        contentType: 'application/json; charset=utf-8',
+                        success: function (result) {
+                            loadPopup.close();
+                            if (!result.sessionExpiredResult && !result.permissionResult) {
+                                //console.log(result);
+                                clearNewIDModal();
+                                if(result["isError"])
+                                {
+                                    popup(result["errorMsg"]);
+                                }
+                                else if(result["fileNames"] != null)
+                                {
+                                    Object.keys(result["fileNames"]).forEach(function (key){
+                                        getFileDownload(result["fileNames"][key]);
+                                    });
+                                    $('#btnExport').prop('disabled', true);
+                                    $('#btnCancel').prop('disabled', true);
+                                    location.reload();
+                                }
+                            }
+                        },
+                        error: function(jqXHR, textStatus, errorThrow){
+                            loadPopup.close();
+                            //console.log(jqXHR);
+                            //console.log(textStatus);
+                            //console.log(errorThrow);
+                            try {
+                                clearNewIDModal();
+                                var exception = $.parseJSON(xhr.responseText);
+                                popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                            } catch (e) {
+                                popup('@message.PopupUnexpectedError');
+                            }
+                        },
+                    });
+                }
+                else if(importType == 'reprint') {
+                    var docNumberTextBox = $('#rePrintDoc').val().trim();
+                    var docNumbers = [];
+
+                    if(docNumberTextBox != '') {
+                        docNumbers.push(docNumberTextBox);
+                    } else {
+                        $('#accountTable input[type=checkbox]:checked').each(function(){
+                            docNumbers.push(this.value);
+                        });
+                    }
+
+                    $.ajax({
+                        url: '@Url.Action("generateImportedExistingDoc", "ExportFile")',
+                        type: 'POST',
+                        data: JSON.stringify({
+                            'docNumbers': docNumbers,
+                            'officerID': officerID,
+                            'Form32BookNo': Form32BookNo,
+                            'Form32No': Form32No,
+                            'Form32ApproveDate': Form32ApproveDate,
+                            'TaxNo': TaxNo,
+                            'TaxDate': TaxDate
+                        }),
+                        async: true,
+                        processData: false,
+                        datatype: "json",
+                        contentType: 'application/json; charset=utf-8',
+                        success: function (result) {
+                            loadPopup.close();
+                            if (!result.sessionExpiredResult && !result.permissionResult) {
+                                clearNewIDModal();
+                                //console.log(result);
+                                if(result["isError"])
+                                {
+                                    popup(result["errorMsg"]);
+                                }
+                                else if(result["fileNames"] != null)
+                                {
+                                    Object.keys(result["fileNames"]).forEach(function (key){
+                                        getFileDownload(result["fileNames"][key]);
+                                    });
+
+                                }
+                            }
+                        },
+                        error: function(jqXHR, textStatus, errorThrow) {
+                            loadPopup.close();
+                            clearNewIDModal();
+                            //console.log(jqXHR);
+                            //console.log(textStatus);
+                            //console.log(errorThrow);
+                            try {
+                                var exception = $.parseJSON(xhr.responseText);
+                                popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                            } catch (e) {
+                                popup('@message.PopupUnexpectedError');
+                            }
+                        },
+                    });
+                }
+
+            }
+            else {
+                popup('@message.PopupRequiredField');
+            }
+
+        });*@
+        /*===== Save Model====================*/
+        /*===== Export ====================*/
+        @*$("#btnExport").click(function () {
+            var importType = $('input[name=importType]:checked').val();
+            //var Form32BookNo = $('#Form32BookNo').val();
+            //var Form32No = $('#Form32No').val();
+            //var Form32ApproveDate = $('#Form32ApproveDate').val();
+            //var TaxNo = $('#TaxNo').val();
+            //var TaxDate = $('#TaxDate').val();
+            //var officerID = $('#authorized').val();
+
+            if (validateCheckBox(importType)) {
+                if(importType == 'reprint') {
+                    var docNumberTextBox = $('#rePrintDoc').val().trim();
+                    var docNumbers = [];
+
+                    if(docNumberTextBox != '') {
+                        docNumbers.push(docNumberTextBox);
+                    } else {
+                        $('#accountTable input[type=checkbox]:checked').each(function(){
+                            docNumbers.push(this.value);
+                        });
+                    }
+                    $.ajax({
+                        url: '@Url.Action("GetImportDocumentKeyInData", "ExportFile")',
+                        type: 'POST',
+                        data: JSON.stringify({
+                            documentNo: docNumbers[0],
+                        }),
+                        async: true,
+                        processData: false,
+                        datatype: "json",
+                        contentType: 'application/json; charset=utf-8',
+                        success: function (data) {
+                            if (!data.sessionExpiredResult && !data.permissionResult) {
+                                if (data != null) {
+                                    $('#Form32BookNo').val(data.Form32BookNo);
+                                    $('#Form32No').val(data.Form32No);
+                                    $('#Form32ApproveDate').val(data.Form32ApproveDate);
+                                    $('#TaxNo').val(data.TaxNo);
+                                    $('#TaxDate').val(data.TaxDate);
+                                    $('#authorized').val(data.authUserID);
+                                    newIDmodal.modal('show');
+                                }
+                            }
+                        },
+                        error: function(xhr) {
+                            try {
+                                var exception = $.parseJSON(xhr.responseText);
+                                popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                            } catch (e) {
+                                popup('@message.PopupUnexpectedError');
+                            }
+                        }
+                    });
+                }
+                else { // importType == new
+                    newIDmodal.modal('show');
+                }
+
+            } else {
+                popup('@message.PopupNoDocumentSelected');
+            }
+
+        });*@
+        /*===== Export ====================*/
+        //$("#btnCancel").click(function () {
+        //    $('#accountTable input[type=checkbox]').prop('checked', false);
+        //    $('#invoiceTable input[type=checkbox]').prop('checked', false);
+        //});
+
+        $('#status').change(function () {
+            //alert('Change Status event, refresh selected status');
+            generateInvTable($(this).val());
+            generateAccountTable($(this).val());
+        });
+
+        $('input[name="selectDocChk"]').change(function () {
+            if ($(this).is(':checked')) {
+                fillPreviousDocData($(this).val());
+            } else {
+                //console.log($(this).val() + ' is now unchecked');
+            }
+        });
+
+        $('a.link').click(function(e)
+        {
+            e.preventDefault();
+        });
+
+        initializeDatePicker();
+        modal = $('#modal').modal({ show: false });
+        newIDmodal = $('#newIDmodal').modal({ show: false });
+    });
+</script>
+
+<div class="content-header"><h3>@message.HeaderExport : @message.LabelImportDocument</h3></div>
+<div class="content">
+    <div class="col-sm-12 sectionHeader">@message.SectionExportCondition</div>
+    @*<div class="row">
+            <div class="col-4of8">
+                <input type="radio" id="modeNewDoc" name="importType" value="new" checked />&nbsp;&nbsp;<b>@message.LabelNewImportDoc</b>
+            </div>
+            <div class="col-4of8">
+                <input type="radio" id="modeReprint" name="importType" value="reprint" />&nbsp;&nbsp;<b>@message.LabelReprintImportDoc</b>
+                <input type="text" id="rePrintDoc" name="rePrintDoc" />
+            </div>
+        </div>*@
+    <br />
+    <!--
+    <div class="row">
+        <div class="col-1of8 bold">เล่มที่ในแบบ 32 <label class="required">*</label></div>:
+        <div class="col-1of8"><input type="text" id="Form32BookNo" name="Form32BookNo" maxlength="5" class="short-medium"></div>
+        <div class="col-1of8 bold">เลขที่ในแบบ 32 <label class="required">*</label></div>:
+        <div class="col-1of8"><input type="text" id="Form32No" name="Form32No" maxlength="3" class="short-medium"></div>
+        <div class="col-2of8 bold">วันที่ออกใบรับรองการนำเข้าในแบบ 32 <label class="required">*</label></div>:
+        <div class="col-2of8"><input type="text" id="Form32ApproveDate" name="Form32ApproveDate"></div>
+    </div>
+    <div class="row">
+        <div class="col-1of8 bold">เลขที่ชำระภาษีอากร <label class="required">*</label></div>:
+        <div class="col-1of8"><input type="text" id="TaxNo" name="TaxNo" maxlength="6" class="short-medium"></div>
+        <div class="col-1of8 bold">วันที่ชำระภาษีอากร <label class="required">*</label></div>:
+        <div class="col-1of8"><input type="text" id="TaxDate" name="TaxDate"></div>
+    </div>
+    <div class="row">
+        <div class="col-1of8 bold">ผู้มีอำนาจลงนาม <label class="required">*</label></div>:
+        <div class="col-7of8">
+            <select id="authorized" name="authorized" class="dropdown">
+                <option value="0">โปรดระบุ</option>
+                @foreach (SelectListItem item in authorizedOfficers)
+                {
+                    <option value="@item.Value">@item.Text</option>
+                }
+            </select>
+        </div>
+    </div>
+    -->
+    @*<div class="row">
+            <div class="col-1of8 bold">สถานะการออกบัญชี</div>:
+            <div class="col-7of8">
+                <select id="status" name="status" class="dropdown">
+                    <option value="all">ทั้งหมด</option>
+                    <option value="unlock">ยังไม่สร้างบัญชี</option>
+                    <option value="lock">สร้างบัญชีแล้ว</option>
+                    <option value="cancel">ยกเลิกบัญชี</option>
+                </select>
+            </div>
+        </div>*@
+    @*<div id="invoiceDiv">
+            <table id="invoiceTable">
+                <thead>
+                    <tr>
+                        <th data-field="selectDoc"><input type="checkbox" id="allInv" /></th>
+                        //<th data-field="preview" data-width="50px">ตัวอย่างข้อมูล</th>
+                        <th data-field="importEntryNo">@message.LabelImportDeclareDocNo</th>
+                        <th data-field="invoiceNo">@message.LabelInvoiceNo</th>
+                        <th data-field="invoiceDate">@message.LabelInvoiceDate</th>
+                        <th data-field="documentStatus">@message.LabelDocumentStatus</th>
+                        <th data-field="documentNo">@message.LabelDocumentNo</th>
+                        <th data-field="username">@message.LabelUsername</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>*@
+
+    @*<div id="accountDiv">
+            <table id="accountTable">
+                <thead>
+                    <tr>
+                        <th data-field="selectDoc"><input type="checkbox" id="allAcc" /></th>
+                        <th data-field="documentNo">@message.LabelDocumentNo</th>
+                        <th data-field="createDate">@message.LabelDocCreateDate</th>
+                        <th data-field="documentStatus">@message.LabelDocumentStatus</th>
+                        <th data-field="username">@message.LabelUsername</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>*@
+
+    <div id="newIDmodal" class="modal fade">
+        <div class="modal-dialog long-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title"></h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <div class="col-1of4">เล่มที่ในแบบ 32 <label class="required">*</label></div>
+                        <div class="col-3of4"><input type="text" id="Form32BookNo" name="Form32BookNo" maxlength="5" class="medium"></div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-1of4">เลขที่ในแบบ 32 <label class="required">*</label></div>
+                        <div class="col-3of4"><input type="text" id="Form32No" name="Form32No" maxlength="3" class="medium"></div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-1of4">วันที่ออกใบรับรองการนำเข้าในแบบ 32 <label class="required">*</label></div>
+                        <div class="col-3of4"><input type="text" id="Form32ApproveDate" name="Form32ApproveDate" class="medium"></div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-1of4">เลขที่ชำระภาษีอากร <label class="required">*</label></div>
+                        <div class="col-3of4"><input type="text" id="TaxNo" name="TaxNo" maxlength="6" class="medium"></div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-1of4">วันที่ชำระภาษีอากร <label class="required">*</label></div>
+                        <div class="col-3of4"><input type="text" id="TaxDate" name="TaxDate" class="medium"></div>
+                    </div>
+                    <div class="form-group">
+                        <div class="col-1of4">ผู้มีอำนาจลงนาม <label class="required">*</label></div>
+                        <div class="col-3of4">
+                            <select id="authorized" name="authorized" class="dropdown">
+                                <option value="0" selected>โปรดระบุ</option>
+                                @foreach (SelectListItem item in authorizedOfficers)
+                                {
+                                <option value="@item.Value">@item.Text</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="btnCancelModal" class="btn kbt-btn-info" data-dismiss="modal">ยกเลิก</button>
+                    <button type="button" id="btnSaveModal" class="btn kbt-btn-info">บันทึก</button>
+                </div>
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+    <div id="modal" class="modal fade">
+        <div class="modal-dialog long-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title"></h4>
+                </div>
+                <div class="modal-body">
+                </div>
+                @*
+                    <div class="modal-footer">
+                    </div>
+                *@
+            </div><!-- /.modal-content -->
+        </div><!-- /.modal-dialog -->
+    </div><!-- /.modal -->
+
+
+    <div class="row">
+        <div class="col-md-3 none-padding">
+            <div class="col-md-5"><label class="kbt-label">@message.LabelDocumentStatus</label></div>
+            <div class="col-md-6">:
+                <select id="statusOptimize" name="statusOptimize" class="kbt-select">
+                    <option value="all">ทั้งหมด</option>
+                    <option value="unlock">ยังไม่สร้างบัญชี</option>
+                    <option value="lock">สร้างบัญชีแล้ว</option>
+                    <option value="cancel">ยกเลิกบัญชี</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-4 none-padding">
+            <div class="col-md-3"><label class="kbt-label">@message.LabelDocumentNo</label></div>
+            <div class="col-md-6">:
+                <input type="text" id="txtSearchOptimize" />
+            </div>
+        </div>
+        <div class="col-md-2 none-padding">
+            <input type="button" id="btnSearchOptimize" class="btn kbt-btn-info" value="@message.ButtonSearch" />
+            <input type="button" id="btnGetListOfId" class="btn kbt-btn-info" value="Get" />
+        </div> 
+    </div>
+    
+    <div id="kbtTable"></div>
+    <div class="row kbt-row">
+        <div class="col-md-1 col-md-offset-4 ">
+            <input type="button" id="btnExport" class="btn kbt-btn-info" value="@message.ButtonExport" />
+        </div>
+        <div class="col-md-1 col-md-offset-1 ">
+            <input type="button" id="btnCancel" class="btn kbt-btn-info" value="@message.ButtonCancel" />
+        </div>
+    </div>
+</div>
+<script>
+    /*=============================================================================================*/
+    var listOfId = [];
+    $("#txtSearchOptimize").not(':disabled').val('');
+    $('#statusOptimize').find(":selected").val(ImportStatus.All);
+    var docStatus=ImportStatus.All;
+    var docNo='';
+    if(docStatus != ImportStatus.Lock){
+        $("#txtSearchOptimize").prop('disabled', true);
+    }
+    init();
+    $('#btnSearchOptimize').on('click',function(e)
+    {
+        $('#kbtTable').kbtTable('setSearchEvent');
+        getKbtTable();
+    });
+
+    //gentable(header,body,importData,function(result){
+    //});
+
+    $( "#statusOptimize" ).change(function() {
+        $( "option:selected",this ).each(function() {
+            console.log($(this).val());
+            if( $(this).val()== ImportStatus.Lock){
+                $("#btnExport").val(kbtLabel.Reprint);
+                $("#txtSearchOptimize").prop('disabled', false);
+                $("#btnExport").prop('disabled', false);
+            }
+            else if($(this).val()== ImportStatus.Cancel){
+                $("#txtSearchOptimize").prop('disabled', true);
+                $("#txtSearchOptimize").val('');
+                $("#btnExport").prop('disabled', true);
+            }
+            else{
+                $("#btnExport").val(kbtLabel.ExportData);
+                $("#btnExport").prop('disabled', false);
+                $("#txtSearchOptimize").prop('disabled', true);
+                $("#txtSearchOptimize").val('');
+            }
+        });
+    });
+    function init() {
+        $('#kbtTable').kbtTable('genTable',{
+            header: ["เลขที่ใบขน","Invoice No.","Invoice Date","สถานะบัญชี","เลขที่บัญชี","ผู้ใช้งาน"],
+            body: ["ImportEntryNo","InvoiceNo","InvoiceDate","DocumentStatus","DocumentNo","CreateBy"],
+            orderBy:["CreateDate",false],
+            data: importData,
+            checkbox: true,
+            idKey: ["InvoiceNo","DocumentNo","ImportEntryNo"],
+            fnGetData:'getKbtTable'
+            //,inputCell:["InvoiceDate"]
+            //,fnChange:'chkChanged'
+        });
+        //$('#kbtTable').kbtTable('setReadOnlyInputCellByColumn',["InvoiceDate"]);
+        //$('#kbtTable').kbtTable('setDisableinputByValue',{
+        //    column:"DocumentStatus",
+        //    value:["สร้างบัญชีแล้ว","ยกเลิกบัญชี"]
+        //});
+        $('#kbtTable').kbtTable('setDisableCheckboxByValue',{
+            column:"DocumentStatus",
+            value:["สร้างบัญชีแล้ว","ยกเลิกบัญชี"],
+            enable:false
+        });
+        $("#kbtTable").kbtTable('setDisableSort',['Invoice Date']);
+    }
+
+    function validateExport() {
+        let listId = $('#kbtTable').kbtTable('getIdKey');
+        if(listId.length > 0){
+            return true;
+        }else{
+            return false;
+        }
+    }
+    function verifyDocument() {
+        let list = $('#kbtTable').kbtTable('getIdKey');
+        let documentNo =[];
+        for (let i = 0; i < list.length; i++) {
+            documentNo.push(list[i].DocumentNo);
+        }
+        $.ajax({
+            url: '@Url.Action("GetImportDocumentKeyInDataList", "ExportFile")',
+            type: 'POST',
+            data: JSON.stringify(documentNo),
+            async: true,
+            processData: false,
+            datatype: "json",
+            contentType: 'application/json; charset=utf-8',
+            success: function (data) {
+                if (!data.sessionExpiredResult && !data.permissionResult) {
+                    if (data != null) {
+                        $('#Form32BookNo').val(data.Form32BookNo);
+                        $('#Form32No').val(data.Form32No);
+                        $('#Form32ApproveDate').val(data.Form32ApproveDate);
+                        $('#TaxNo').val(data.TaxNo);
+                        $('#TaxDate').val(data.TaxDate);
+                        $('#authorized').val(data.authUserID);
+                    }
+                }
+            },
+            error: function(xhr) {
+                try {
+                    var exception = $.parseJSON(xhr.responseText);
+                    popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                } catch (e) {
+                    popup('@message.PopupUnexpectedError');
+                }
+            }
+        });
+    }
+    /*============================*/
+    $('#btnSaveModal').click(function () {
+        var Form32BookNo = $('#Form32BookNo').val();
+        var Form32No = $('#Form32No').val();
+        var Form32ApproveDate = $('#Form32ApproveDate').val();
+        var TaxNo = $('#TaxNo').val();
+        var TaxDate = $('#TaxDate').val();
+        var officerID = $('#authorized').val();
+
+        if(validateSaveNew()) {
+            var loadPopup = loading('@message.LoadingDocCreation');
+            if($("#btnExport").val() == kbtLabel.ExportData) {
+                let list = $('#kbtTable').kbtTable('getIdKey');
+                let importEntries =[];
+                for (let i = 0; i < list.length; i++) {
+                    importEntries.push(list[i].ImportEntryNo); 
+                }
+                $.ajax({
+                    url: '@Url.Action("generateImportedNewDoc", "ExportFile")',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        'importEntries': importEntries,
+                        'officerID': officerID,
+                        'Form32BookNo': Form32BookNo,
+                        'Form32No': Form32No,
+                        'Form32ApproveDate': Form32ApproveDate,
+                        'TaxNo': TaxNo,
+                        'TaxDate': TaxDate
+                    }),
+                    async: true,
+                    processData: false,
+                    datatype: "json",
+                    contentType: 'application/json; charset=utf-8',
+                    success: function (result) {
+                        loadPopup.close();
+                        if (!result.sessionExpiredResult && !result.permissionResult) {
+                            //console.log(result);
+                            clearNewIDModal();
+                            if(result["isError"])
+                            {
+                                popup(result["errorMsg"]);
+                            }
+                            else if(result["fileNames"] != null)
+                            {
+                                Object.keys(result["fileNames"]).forEach(function (key){
+                                    getFileDownload(result["fileNames"][key]);
+                                });
+                                $('#btnExport').prop('disabled', true);
+                                $('#btnCancel').prop('disabled', true);
+                                location.reload();
+                            }
+                        }
+                    },
+                    error: function(jqXHR, textStatus, errorThrow){
+                        loadPopup.close();
+                        //console.log(jqXHR);
+                        //console.log(textStatus);
+                        //console.log(errorThrow);
+                        try {
+                            clearNewIDModal();
+                            var exception = $.parseJSON(xhr.responseText);
+                            popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                        } catch (e) {
+                            popup('@message.PopupUnexpectedError');
+                        }
+                    },
+                });
+                
+            }
+            else if($("#btnExport").val() == kbtLabel.Reprint) {
+                let list = $('#kbtTable').kbtTable('getIdKey');
+                let docNumbers =[];
+                for (let i = 0; i < list.length; i++) {
+                    docNumbers.push(list[i].DocumentNo);
+                }
+
+                $.ajax({
+                    url: '@Url.Action("generateImportedExistingDoc", "ExportFile")',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        'docNumbers': docNumbers,
+                        'officerID': officerID,
+                        'Form32BookNo': Form32BookNo,
+                        'Form32No': Form32No,
+                        'Form32ApproveDate': Form32ApproveDate,
+                        'TaxNo': TaxNo,
+                        'TaxDate': TaxDate
+                    }),
+                    async: true,
+                    processData: false,
+                    datatype: "json",
+                    contentType: 'application/json; charset=utf-8',
+                    success: function (result) {
+                        loadPopup.close();
+                        if (!result.sessionExpiredResult && !result.permissionResult) {
+                            clearNewIDModal();
+                            //console.log(result);
+                            if(result["isError"])
+                            {
+                                popup(result["errorMsg"]);
+                            }
+                            else if(result["fileNames"] != null)
+                            {
+                                Object.keys(result["fileNames"]).forEach(function (key){
+                                    getFileDownload(result["fileNames"][key]);
+                                });
+
+                            }
+                        }
+                    },
+                    error: function(jqXHR, textStatus, errorThrow) {
+                        loadPopup.close();
+                        clearNewIDModal();
+                        //console.log(jqXHR);
+                        //console.log(textStatus);
+                        //console.log(errorThrow);
+                        try {
+                            var exception = $.parseJSON(xhr.responseText);
+                            popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                        } catch (e) {
+                            popup('@message.PopupUnexpectedError');
+                        }
+                    },
+                });
+            }
+
+        }
+        else {
+            popup('@message.PopupRequiredField');
+        }
+
+    });
+    /*==============================*/
+    function validateSaveNew() {
+        var Form32BookNo = $('#Form32BookNo').val();
+        var Form32No = $('#Form32No').val();
+        var Form32ApproveDate = $('#Form32ApproveDate').val();
+        var TaxNo = $('#TaxNo').val();
+        var TaxDate = $('#TaxDate').val();
+        var officerID = $('#authorized').val();
+
+        if(Form32BookNo == ''
+            || Form32No == ''
+            || Form32ApproveDate == ''
+            || TaxNo == ''
+            || TaxDate == ''
+            || officerID == 0) {
+
+            return false;
+        } else {
+            return true;
+        }
+    }
+    /*=============================*/
+    $("#btnExport").click(function () {
+        if (validateExport()) {
+            let list = $('#kbtTable').kbtTable('getIdKey');
+            let documentNo =[];
+            for (let i = 0; i < list.length; i++) {
+                documentNo.push(list[i].DocumentNo);
+            }
+
+            if($("#btnExport").val() == kbtLabel.ExportData){
+                if(list.length > 1){
+                    popup('@message.PopupSelectOnlyOneImportEntryNo');
+                    return false;
+                }
+            }
+
+            $.when( ajaxPost('@Url.Action("GetImportDocumentKeyInDataList", "ExportFile")',documentNo) ).then(function(res) {
+                if (!res.sessionExpiredResult && !res.permissionResult) {
+                    if (res != null) {
+                        $('#Form32BookNo').val(res.Form32BookNo);
+                        $('#Form32No').val(res.Form32No);
+                        $('#Form32ApproveDate').val(res.Form32ApproveDate);
+                        $('#TaxNo').val(res.TaxNo);
+                        $('#TaxDate').val(res.TaxDate);
+                        if(res.authUserID == ""){
+                            //$('#authorized').val(res.authUserID);
+                        }
+                        else{
+                            $('#authorized').val(res.authUserID);
+                        }
+                        newIDmodal.modal('show');
+                    }
+                }
+            },function (err) {
+                try {
+                    var exception = $.parseJSON(err.responseText);
+                    popup('@message.PopupUnexpectedError' + '<br/>' + exception.errorMessage + exception.stacktrace);
+                } catch (e) {
+                    popup('@message.PopupUnexpectedError');
+                }
+            });
+        }else {
+            popup('@message.PopupNoDocumentSelected');
+        }
+    });
+    /*============================================*/
+    $("#btnCancel").click(function () {
+        $('#kbtTable').kbtTable('setClearCheckbox');
+    });
+
+    function getKbtTable() {
+        let behaveType = $('#kbtTable').kbtTable('getSourceEvent');
+        let hasBeenInit = $("#kbtTable").has("table.kbt-table").length ? true : false;
+        docNo = $("#txtSearchOptimize").not(':disabled').val() == undefined?'':$("#txtSearchOptimize").not(':disabled').val();
+        docStatus=$('#statusOptimize').find(":selected").val();
+
+        var pagingIndex = "0";
+        var pagingSize = "10";
+        var orderByColumn = "CREATEDATE";
+        var orderByASC = "false";
+
+        if(hasBeenInit){
+            if(behaveType == BehaveType.Search){
+
+                $('#kbtTable').kbtTable('setInitialPaging',true);
+                $('#kbtTable').kbtTable('setInitialOrderBy',["CreateDate","false"]);
+            }
+            else if(behaveType == BehaveType.PageSize){
+                $('#kbtTable').kbtTable('setInitialPaging',false);
+            }
+
+            let paging = $('#kbtTable').kbtTable('getPaging');
+            pagingIndex = paging.index;
+            pagingSize = paging.size
+            let orderBy = $('#kbtTable').kbtTable('getOrderBy');
+            orderByColumn = orderBy.column;
+            orderByASC = orderBy.asc;
+        }
+
+        var search = {
+            "PageIndex": pagingIndex,
+            "PageSize": pagingSize,
+            "OrderByTable": "",
+            "OrderByColumn": orderByColumn,
+            "OrderByASC": orderByASC,
+            "ListOfCondition":[{"ColumnName": "DocumentNo","Operator": operators.Like,"Value": "%"+docNo+"%","Joiner": joiner.And,"Type":Type.String}]
+        }
+        if(docStatus != ImportStatus.All){
+            search.ListOfCondition.push({"ColumnName": "RecordStatus","Operator": operators.Equal,"Value": docStatus,"Joiner": joiner.And,"Type":Type.String});
+        }
+        $.when( ajaxPost('@Url.Action("GetImportDocumentOptimize", "ExportFile")',search) ).then(function(res) {
+            if(res.ListOfResult.length == 0){
+                popup('ไม่พบข้อมูลที่ต้องการค้นหา');
+                $("#kbtTable").html("");
+                $('#bControl').hide();
+            } else {
+                if(docStatus == ImportStatus.Lock||docStatus == ImportStatus.Cancel){
+                    $('#kbtTable').kbtTable('genTable',{
+                        header: ["เลขที่บัญชี","วันที่สร้างบัญชีนำเข้า","สถานะบัญชี","ผู้ใช้งาน"],
+                        body: ["DocumentNo","DocumentDate","DocumentStatus","CreateBy"],
+                        orderBy:["CreateDate",false],
+                        data: res,
+                        checkbox: true,
+                        idKey: ["InvoiceNo","DocumentNo"],
+                        fnGetData:'getKbtTable'
+                    });
+                    //$('#kbtTable').kbtTable('setDisableSort',["สถานะบัญชี","ผู้ใช้งาน"]);
+                    $('#kbtTable').kbtTable('setDisableCheckboxByValue',{
+                        column:"DocumentStatus",
+                        value:["ยกเลิกบัญชี"],
+                        enable:false
+                    });
+                    $("#kbtTable").kbtTable('setDisableSort',['Invoice Date']);
+
+                }else{
+                    $('#kbtTable').kbtTable('genTable',{
+                        header: ["เลขที่ใบขน","Invoice No.","Invoice Date","สถานะบัญชี","เลขที่บัญชี","ผู้ใช้งาน"],
+                        body: ["ImportEntryNo","InvoiceNo","InvoiceDate","DocumentStatus","DocumentNo","CreateBy"],
+                        orderBy:["CreateDate",false],
+                        data: res,
+                        checkbox: true,
+                        //rowLink:true,
+                        //iconEdit:false,
+                        //iconDel:true,
+                        idKey: ["InvoiceNo","DocumentNo","ImportEntryNo"],
+                        fnGetData:'getKbtTable'
+                        //,fnRowClick:'editRowClick',fnCellClick:'editCellClick'
+                    });
+                    //$('#kbtTable').kbtTable('setDisableSort',["สถานะบัญชี","เลขที่บัญชี","ผู้ใช้งาน"]);
+                    $('#kbtTable').kbtTable('setDisableCheckboxByValue',{
+                        column:"DocumentStatus",
+                        value:["สร้างบัญชีแล้ว","ยกเลิกบัญชี"],
+                        enable:false
+                    });
+                    $("#kbtTable").kbtTable('setDisableSort',['Invoice Date']);
+
+                }
+            }
+        },function (err) {
+            var er = err;
+        });
+    }
+    $('#btnGetListOfId').on('click', function (e) {
+        //listOfId = $('#kbtTable').kbtTable('getIdKey');
+        $.when( ajaxGet('@Url.Action("GetImportExcel", "ExportFile")',1) ).then(function(res) {},function (err) {
+    
+        });
+    });
+    function editClick() {
+        listOfId = $('#kbtTable').kbtTable('getIdKey');
+        console.log(listOfId[0]);
+    }
+    function chkChanged(tr,checked) {
+        //listOfId = $('#kbtTable').kbtTable('getIdKey');
+        var tr =tr;     
+        if(checked){
+            $('#kbtTable').kbtTable('setBuildDatePicker',tr);
+        }
+        else{
+            $('#kbtTable').kbtTable('setDestroyDatePicker',tr);
+        }
+    }
+    /*=============================================================================================*/
+</script>
